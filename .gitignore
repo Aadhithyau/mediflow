@@ -1,0 +1,38 @@
+# Java / Maven
+**/target/
+*.class
+*.jar
+*.war
+*.log
+
+# Spring Tool Suite / Eclipse
+**/.classpath
+**/.project
+**/.settings/
+**/.factorypath
+**/bin/
+
+# Node / Vite
+**/node_modules/
+**/dist/
+**/.vite/
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+**/application-local.properties
+**/application-local.yml
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Operating system
+.DS_Store
+Thumbs.db
+
+# Test output
+coverage/
+test-results/
