@@ -40,6 +40,9 @@ SecurityFilterChain securityFilterChain(
             .requestMatchers("/api/admin/**")
                 .hasRole("ADMIN")
 
+            .requestMatchers("/api/doctor/**")
+                .hasRole("DOCTOR")
+
             .requestMatchers("/api/users/me")
                 .hasAnyRole(
                     "PATIENT",
@@ -85,5 +88,6 @@ PasswordEncoder passwordEncoder() {
     return PasswordEncoderFactories
         .createDelegatingPasswordEncoder();
 }
+
 
 }
