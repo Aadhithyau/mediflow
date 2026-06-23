@@ -14,62 +14,76 @@ import org.springframework.security.web.SecurityFilterChain;
 @Configuration
 public class SecurityConfig {
 
-    @Bean
-    SecurityFilterChain securityFilterChain(
-        HttpSecurity http,
-        JwtAuthenticationConverter jwtAuthenticationConverter
-    ) throws Exception {
+@Bean
+SecurityFilterChain securityFilterChain(
+    HttpSecurity http,
+    JwtAuthenticationConverter jwtAuthenticationConverter
+) throws Exception {
 
-        http
-            .csrf(AbstractHttpConfigurer::disable)
-            .formLogin(AbstractHttpConfigurer::disable)
-            .httpBasic(AbstractHttpConfigurer::disable)
-            .sessionManagement(session ->
-                session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+    http
+        .csrf(AbstractHttpConfigurer::disable)
+        .formLogin(AbstractHttpConfigurer::disable)
+        .httpBasic(AbstractHttpConfigurer::disable)
+        .sessionManagement(session ->
+            session.sessionCreationPolicy(
+                SessionCreationPolicy.STATELESS
             )
-            .authorizeHttpRequests(authorize -> authorize
-            		.requestMatchers(
-            			    "/api/health",
-            			    "/actuator/health",
-            			    "/api/auth/**",
-            			    "/error"
-            			).permitAll()
-            			.requestMatchers("/api/users/me")
-            			    .hasAnyRole("PATIENT", "DOCTOR", "ADMIN")
-            			.anyRequest().authenticated()
-            )
-            .oauth2ResourceServer(oauth2 ->
-                oauth2.jwt(jwt ->
-                    jwt.jwtAuthenticationConverter(
-                        jwtAuthenticationConverter
-                    )
+        )
+        .authorizeHttpRequests(authorize -> authorize
+            .requestMatchers(
+                "/api/health",
+                "/actuator/health",
+                "/api/auth/**",
+                "/error"
+            ).permitAll()
+
+            .requestMatchers("/api/admin/**")
+                .hasRole("ADMIN")
+
+            .requestMatchers("/api/users/me")
+                .hasAnyRole(
+                    "PATIENT",
+                    "DOCTOR",
+                    "ADMIN"
                 )
-            );
 
-        return http.build();
-    }
-
-    @Bean
-    JwtAuthenticationConverter jwtAuthenticationConverter() {
-
-        JwtGrantedAuthoritiesConverter authoritiesConverter =
-            new JwtGrantedAuthoritiesConverter();
-
-        authoritiesConverter.setAuthoritiesClaimName("role");
-        authoritiesConverter.setAuthorityPrefix("ROLE_");
-
-        JwtAuthenticationConverter authenticationConverter =
-            new JwtAuthenticationConverter();
-
-        authenticationConverter.setJwtGrantedAuthoritiesConverter(
-            authoritiesConverter
+            .anyRequest()
+                .authenticated()
+        )
+        .oauth2ResourceServer(oauth2 ->
+            oauth2.jwt(jwt ->
+                jwt.jwtAuthenticationConverter(
+                    jwtAuthenticationConverter
+                )
+            )
         );
 
-        return authenticationConverter;
-    }
+    return http.build();
+}
 
-    @Bean
-    PasswordEncoder passwordEncoder() {
-        return PasswordEncoderFactories.createDelegatingPasswordEncoder();
-    }
+@Bean
+JwtAuthenticationConverter jwtAuthenticationConverter() {
+
+    JwtGrantedAuthoritiesConverter authoritiesConverter =
+        new JwtGrantedAuthoritiesConverter();
+
+    authoritiesConverter.setAuthoritiesClaimName("role");
+    authoritiesConverter.setAuthorityPrefix("ROLE_");
+
+    JwtAuthenticationConverter authenticationConverter =
+        new JwtAuthenticationConverter();
+
+    authenticationConverter.setJwtGrantedAuthoritiesConverter(
+        authoritiesConverter
+    );
+
+    return authenticationConverter;
+}
+
+@Bean
+PasswordEncoder passwordEncoder() {
+    return PasswordEncoderFactories
+        .createDelegatingPasswordEncoder();
+}
+
 }
