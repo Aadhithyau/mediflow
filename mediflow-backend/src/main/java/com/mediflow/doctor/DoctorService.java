@@ -1,5 +1,6 @@
 package com.mediflow.doctor;
 
+import java.util.List;
 import java.util.Locale;
 
 import org.springframework.http.HttpStatus;
@@ -10,6 +11,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.mediflow.doctor.dto.CreateDoctorRequest;
 import com.mediflow.doctor.dto.CreateDoctorResponse;
+import com.mediflow.doctor.dto.DoctorSummaryResponse;
 import com.mediflow.user.Role;
 import com.mediflow.user.User;
 import com.mediflow.user.UserRepository;
@@ -109,5 +111,20 @@ public CreateDoctorResponse createDoctor(
     );
 }
 
+@Transactional(readOnly = true)
+public List<DoctorSummaryResponse> getAllDoctors() {
+    return doctorProfileRepository
+        .findAllByUserEnabledTrueOrderByUserFullNameAsc()
+        .stream()
+        .map(profile -> new DoctorSummaryResponse(
+            profile.getId(),
+            profile.getUser().getId(),
+            profile.getUser().getFullName(),
+            profile.getSpecialization(),
+            profile.getConsultationFee(),
+            profile.getBio()
+        ))
+        .toList();
+}
 
 }

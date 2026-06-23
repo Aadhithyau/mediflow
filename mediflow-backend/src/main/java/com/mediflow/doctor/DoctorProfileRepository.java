@@ -1,18 +1,22 @@
 package com.mediflow.doctor;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface DoctorProfileRepository
-    extends JpaRepository<DoctorProfile, Long> {
+extends JpaRepository<DoctorProfile, Long> {
 
-    Optional<DoctorProfile> findByUserId(Long userId);
+Optional<DoctorProfile> findByUserId(Long userId);
 
-    boolean existsByUserId(Long userId);
+boolean existsByUserId(Long userId);
 
-    boolean existsByMedicalLicenseNumber(
-        String medicalLicenseNumber
-    );
+boolean existsByMedicalLicenseNumber(
+    String medicalLicenseNumber
+);
+
+List<DoctorProfile>
+    findAllByUserEnabledTrueOrderByUserFullNameAsc();
+
 }
-
