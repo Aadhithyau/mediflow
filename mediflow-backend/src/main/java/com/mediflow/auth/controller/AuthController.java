@@ -8,6 +8,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.mediflow.auth.AuthService;
+import com.mediflow.auth.dto.LoginRequest;
+import com.mediflow.auth.dto.LoginResponse;
 import com.mediflow.auth.dto.RegisterRequest;
 import com.mediflow.auth.dto.RegisterResponse;
 
@@ -32,5 +34,12 @@ public class AuthController {
         return ResponseEntity
             .status(HttpStatus.CREATED)
             .body(response);
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<LoginResponse> login(
+        @Valid @RequestBody LoginRequest request
+    ) {
+        return ResponseEntity.ok(authService.login(request));
     }
 }
