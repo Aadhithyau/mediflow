@@ -10,8 +10,9 @@ import org.springframework.data.repository.query.Param;
 public interface AppointmentRepository
     extends JpaRepository<Appointment, Long> {
 
-    boolean existsByAvailabilitySlot_Id(
-        Long availabilitySlotId
+    boolean existsByAvailabilitySlot_IdAndStatusNot(
+        Long availabilitySlotId,
+        AppointmentStatus excludedStatus
     );
 
     @Query("""
@@ -52,5 +53,19 @@ public interface AppointmentRepository
     Optional<Appointment> findOwnedAppointmentForDoctor(
         @Param("appointmentId") Long appointmentId,
         @Param("doctorUserId") Long doctorUserId
+    );
+
+    @Query("""
+        SELECT appointment
+        FROM Appointment appointment
+        JOIN FETCH appointment.availabilitySlot slot
+        JOIN FETCH slot.doctorProfile doctorProfile
+        JOIN FETCH doctorProfile.user
+        WHERE appointment.id = :appointmentId
+          AND appointment.patient.id = :patientUserId
+        """)
+    Optional<Appointment> findOwnedAppointmentForPatient(
+        @Param("appointmentId") Long appointmentId,
+        @Param("patientUserId") Long patientUserId
     );
 }

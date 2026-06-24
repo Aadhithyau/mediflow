@@ -7,6 +7,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -57,5 +59,20 @@ public class PatientAppointmentController {
             );
 
         return ResponseEntity.ok(appointments);
+    }
+
+    @PatchMapping("/{appointmentId}/cancel")
+    public ResponseEntity<AppointmentResponse>
+        cancelAppointment(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long appointmentId
+        ) {
+        AppointmentResponse response =
+            appointmentService.cancelAppointment(
+                jwt.getSubject(),
+                appointmentId
+            );
+
+        return ResponseEntity.ok(response);
     }
 }

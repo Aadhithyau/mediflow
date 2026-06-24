@@ -21,6 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.mediflow.appointment.AppointmentStatus;
 import com.mediflow.availability.dto.AvailabilitySlotResponse;
 import com.mediflow.doctor.DoctorProfile;
 import com.mediflow.doctor.DoctorProfileRepository;
@@ -101,13 +102,18 @@ class AvailabilityServiceTest {
         when(laterSlot.getEndTime())
             .thenReturn(laterEnd);
 
-        when(slotRepository.findAvailableFutureSlots(
-            eq(doctorProfileId),
-            any(OffsetDateTime.class)
-        )).thenReturn(List.of(earlierSlot, laterSlot));
+        when(
+            slotRepository.findAvailableFutureSlots(
+                eq(doctorProfileId),
+                any(OffsetDateTime.class),
+                eq(AppointmentStatus.CANCELLED)
+            )
+        ).thenReturn(List.of(earlierSlot, laterSlot));
 
         List<AvailabilitySlotResponse> result =
-            availabilityService.getFutureSlots(doctorProfileId);
+            availabilityService.getFutureSlots(
+                doctorProfileId
+            );
 
         assertThat(result).containsExactly(
             new AvailabilitySlotResponse(
@@ -126,7 +132,8 @@ class AvailabilityServiceTest {
 
         verify(slotRepository).findAvailableFutureSlots(
             eq(doctorProfileId),
-            any(OffsetDateTime.class)
+            any(OffsetDateTime.class),
+            eq(AppointmentStatus.CANCELLED)
         );
     }
 
@@ -147,7 +154,9 @@ class AvailabilityServiceTest {
             .thenReturn(false);
 
         assertThatThrownBy(
-            () -> availabilityService.getFutureSlots(doctorProfileId)
+            () -> availabilityService.getFutureSlots(
+                doctorProfileId
+            )
         )
             .isInstanceOf(ResponseStatusException.class)
             .satisfies(exception -> {
@@ -158,7 +167,9 @@ class AvailabilityServiceTest {
                     .isEqualTo(HttpStatus.NOT_FOUND);
 
                 assertThat(responseException.getReason())
-                    .isEqualTo("Doctor profile was not found");
+                    .isEqualTo(
+                        "Doctor profile was not found"
+                    );
             });
 
         verifyNoInteractions(slotRepository);

@@ -39,23 +39,28 @@ class DoctorAvailabilitySlotRepositoryIntegrationTest {
     private AppointmentRepository appointmentRepository;
 
     @Test
-    void findAvailableFutureSlotsExcludesBookedAndPastSlotsAndOrdersResults() {
+    void findAvailableFutureSlotsIncludesCancelledSlotAndExcludesBookedSlot() {
         String uniqueValue = UUID.randomUUID().toString();
 
         User doctorUser = createUser(
             "Availability Test Doctor",
-            "availability-doctor-" + uniqueValue + "@example.com",
+            "availability-doctor-" + uniqueValue
+                + "@example.com",
             Role.DOCTOR
         );
 
         User patientUser = createUser(
             "Availability Test Patient",
-            "availability-patient-" + uniqueValue + "@example.com",
+            "availability-patient-" + uniqueValue
+                + "@example.com",
             Role.PATIENT
         );
 
         DoctorProfile doctorProfile =
-            createDoctorProfile(doctorUser, uniqueValue);
+            createDoctorProfile(
+                doctorUser,
+                uniqueValue
+            );
 
         OffsetDateTime now =
             OffsetDateTime.now(ZoneOffset.UTC).withNano(0);
@@ -66,11 +71,12 @@ class DoctorAvailabilitySlotRepositoryIntegrationTest {
             now.minusDays(2).plusHours(1)
         );
 
-        DoctorAvailabilitySlot earlierAvailableSlot = createSlot(
-            doctorProfile,
-            now.plusDays(1),
-            now.plusDays(1).plusHours(1)
-        );
+        DoctorAvailabilitySlot earlierAvailableSlot =
+            createSlot(
+                doctorProfile,
+                now.plusDays(1),
+                now.plusDays(1).plusHours(1)
+            );
 
         DoctorAvailabilitySlot bookedSlot = createSlot(
             doctorProfile,
@@ -78,28 +84,45 @@ class DoctorAvailabilitySlotRepositoryIntegrationTest {
             now.plusDays(2).plusHours(1)
         );
 
-        DoctorAvailabilitySlot laterAvailableSlot = createSlot(
+        DoctorAvailabilitySlot cancelledSlot = createSlot(
             doctorProfile,
             now.plusDays(3),
             now.plusDays(3).plusHours(1)
         );
 
+        DoctorAvailabilitySlot laterAvailableSlot =
+            createSlot(
+                doctorProfile,
+                now.plusDays(4),
+                now.plusDays(4).plusHours(1)
+            );
+
         createAppointment(
             bookedSlot,
             patientUser,
-            doctorProfile.getConsultationFee()
+            doctorProfile.getConsultationFee(),
+            AppointmentStatus.BOOKED
+        );
+
+        createAppointment(
+            cancelledSlot,
+            patientUser,
+            doctorProfile.getConsultationFee(),
+            AppointmentStatus.CANCELLED
         );
 
         List<DoctorAvailabilitySlot> result =
             slotRepository.findAvailableFutureSlots(
                 doctorProfile.getId(),
-                now
+                now,
+                AppointmentStatus.CANCELLED
             );
 
         assertThat(result)
             .extracting(DoctorAvailabilitySlot::getId)
             .containsExactly(
                 earlierAvailableSlot.getId(),
+                cancelledSlot.getId(),
                 laterAvailableSlot.getId()
             );
 
@@ -120,7 +143,9 @@ class DoctorAvailabilitySlotRepositoryIntegrationTest {
 
         user.setFullName(fullName);
         user.setEmail(email);
-        user.setPasswordHash("integration-test-password-hash");
+        user.setPasswordHash(
+            "integration-test-password-hash"
+        );
         user.setRole(role);
         user.setEnabled(true);
 
@@ -131,10 +156,13 @@ class DoctorAvailabilitySlotRepositoryIntegrationTest {
         User doctorUser,
         String uniqueValue
     ) {
-        DoctorProfile doctorProfile = new DoctorProfile();
+        DoctorProfile doctorProfile =
+            new DoctorProfile();
 
         doctorProfile.setUser(doctorUser);
-        doctorProfile.setSpecialization("General Medicine");
+        doctorProfile.setSpecialization(
+            "General Medicine"
+        );
         doctorProfile.setMedicalLicenseNumber(
             "TEST-LIC-" + uniqueValue
         );
@@ -168,13 +196,14 @@ class DoctorAvailabilitySlotRepositoryIntegrationTest {
     private Appointment createAppointment(
         DoctorAvailabilitySlot slot,
         User patientUser,
-        BigDecimal consultationFee
+        BigDecimal consultationFee,
+        AppointmentStatus status
     ) {
         Appointment appointment = new Appointment();
 
         appointment.setAvailabilitySlot(slot);
         appointment.setPatient(patientUser);
-        appointment.setStatus(AppointmentStatus.BOOKED);
+        appointment.setStatus(status);
         appointment.setConsultationFeeSnapshot(
             consultationFee
         );

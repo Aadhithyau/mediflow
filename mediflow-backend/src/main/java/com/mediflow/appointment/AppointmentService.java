@@ -25,7 +25,7 @@ import com.mediflow.user.UserRepository;
 public class AppointmentService {
 
     private static final String DUPLICATE_BOOKING_CONSTRAINT =
-        "uq_appointments_availability_slot";
+        "uq_appointments_non_cancelled_slot";
 
     private final AppointmentRepository appointmentRepository;
     private final DoctorAvailabilitySlotRepository slotRepository;
@@ -46,13 +46,7 @@ public class AppointmentService {
         String patientEmail,
         CreateAppointmentRequest request
     ) {
-        User patient = userRepository.findByEmail(patientEmail)
-            .filter(User::isEnabled)
-            .filter(user -> user.getRole() == Role.PATIENT)
-            .orElseThrow(() -> new ResponseStatusException(
-                HttpStatus.FORBIDDEN,
-                "Patient account is unavailable"
-            ));
+        User patient = findEnabledPatient(patientEmail);
 
         DoctorAvailabilitySlot slot = slotRepository
             .findById(request.availabilitySlotId())
@@ -84,7 +78,10 @@ public class AppointmentService {
         }
 
         boolean alreadyBooked = appointmentRepository
-            .existsByAvailabilitySlot_Id(slot.getId());
+            .existsByAvailabilitySlot_IdAndStatusNot(
+                slot.getId(),
+                AppointmentStatus.CANCELLED
+            );
 
         if (alreadyBooked) {
             throw bookingConflict();
@@ -116,56 +113,66 @@ public class AppointmentService {
             throw exception;
         }
 
-        return new AppointmentResponse(
-            savedAppointment.getId(),
-            slot.getId(),
-            doctorProfile.getId(),
-            doctorUser.getFullName(),
-            slot.getStartTime(),
-            slot.getEndTime(),
-            savedAppointment.getConsultationFeeSnapshot(),
-            savedAppointment.getStatus(),
-            savedAppointment.getCreatedAt()
-        );
+        return toPatientAppointmentResponse(savedAppointment);
     }
 
     @Transactional(readOnly = true)
     public List<AppointmentResponse> getPatientAppointments(
         String patientEmail
     ) {
-        User patient = userRepository.findByEmail(patientEmail)
-            .filter(User::isEnabled)
-            .filter(user -> user.getRole() == Role.PATIENT)
-            .orElseThrow(() -> new ResponseStatusException(
-                HttpStatus.FORBIDDEN,
-                "Patient account is unavailable"
-            ));
+        User patient = findEnabledPatient(patientEmail);
 
         return appointmentRepository
             .findAllForPatient(patient.getId())
             .stream()
-            .map(appointment -> {
-                DoctorAvailabilitySlot slot =
-                    appointment.getAvailabilitySlot();
-
-                DoctorProfile doctorProfile =
-                    slot.getDoctorProfile();
-
-                User doctorUser = doctorProfile.getUser();
-
-                return new AppointmentResponse(
-                    appointment.getId(),
-                    slot.getId(),
-                    doctorProfile.getId(),
-                    doctorUser.getFullName(),
-                    slot.getStartTime(),
-                    slot.getEndTime(),
-                    appointment.getConsultationFeeSnapshot(),
-                    appointment.getStatus(),
-                    appointment.getCreatedAt()
-                );
-            })
+            .map(this::toPatientAppointmentResponse)
             .toList();
+    }
+
+    @Transactional
+    public AppointmentResponse cancelAppointment(
+        String patientEmail,
+        Long appointmentId
+    ) {
+        User patient = findEnabledPatient(patientEmail);
+
+        Appointment appointment = appointmentRepository
+            .findOwnedAppointmentForPatient(
+                appointmentId,
+                patient.getId()
+            )
+            .orElseThrow(() -> new ResponseStatusException(
+                HttpStatus.NOT_FOUND,
+                "Appointment was not found for this patient"
+            ));
+
+        if (appointment.getStatus() != AppointmentStatus.BOOKED) {
+            throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "Only booked appointments can be cancelled"
+            );
+        }
+
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+
+        if (
+            !appointment.getAvailabilitySlot()
+                .getStartTime()
+                .isAfter(now)
+        ) {
+            throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "Appointment can no longer be cancelled"
+            );
+        }
+
+        appointment.setStatus(AppointmentStatus.CANCELLED);
+        appointment.setCompletedAt(null);
+
+        Appointment savedAppointment =
+            appointmentRepository.saveAndFlush(appointment);
+
+        return toPatientAppointmentResponse(savedAppointment);
     }
 
     @Transactional(readOnly = true)
@@ -201,7 +208,7 @@ public class AppointmentService {
         if (appointment.getStatus() != AppointmentStatus.BOOKED) {
             throw new ResponseStatusException(
                 HttpStatus.CONFLICT,
-                "Appointment has already been completed"
+                "Only booked appointments can be completed"
             );
         }
 
@@ -216,6 +223,16 @@ public class AppointmentService {
         return toDoctorAppointmentResponse(savedAppointment);
     }
 
+    private User findEnabledPatient(String patientEmail) {
+        return userRepository.findByEmail(patientEmail)
+            .filter(User::isEnabled)
+            .filter(user -> user.getRole() == Role.PATIENT)
+            .orElseThrow(() -> new ResponseStatusException(
+                HttpStatus.FORBIDDEN,
+                "Patient account is unavailable"
+            ));
+    }
+
     private User findEnabledDoctor(String doctorEmail) {
         return userRepository.findByEmail(doctorEmail)
             .filter(User::isEnabled)
@@ -224,6 +241,30 @@ public class AppointmentService {
                 HttpStatus.FORBIDDEN,
                 "Doctor account is unavailable"
             ));
+    }
+
+    private AppointmentResponse toPatientAppointmentResponse(
+        Appointment appointment
+    ) {
+        DoctorAvailabilitySlot slot =
+            appointment.getAvailabilitySlot();
+
+        DoctorProfile doctorProfile =
+            slot.getDoctorProfile();
+
+        User doctorUser = doctorProfile.getUser();
+
+        return new AppointmentResponse(
+            appointment.getId(),
+            slot.getId(),
+            doctorProfile.getId(),
+            doctorUser.getFullName(),
+            slot.getStartTime(),
+            slot.getEndTime(),
+            appointment.getConsultationFeeSnapshot(),
+            appointment.getStatus(),
+            appointment.getCreatedAt()
+        );
     }
 
     private DoctorAppointmentResponse toDoctorAppointmentResponse(

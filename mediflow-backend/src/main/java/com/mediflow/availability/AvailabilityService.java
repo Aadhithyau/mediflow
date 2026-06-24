@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.mediflow.appointment.AppointmentStatus;
 import com.mediflow.availability.dto.AvailabilitySlotResponse;
 import com.mediflow.availability.dto.CreateAvailabilitySlotRequest;
 import com.mediflow.doctor.DoctorProfile;
@@ -129,7 +130,8 @@ public class AvailabilityService {
         return slotRepository
             .findAvailableFutureSlots(
                 doctorProfile.getId(),
-                OffsetDateTime.now(ZoneOffset.UTC)
+                OffsetDateTime.now(ZoneOffset.UTC),
+                AppointmentStatus.CANCELLED
             )
             .stream()
             .map(slot -> new AvailabilitySlotResponse(

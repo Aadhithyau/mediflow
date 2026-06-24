@@ -56,6 +56,12 @@ public class SecurityConfig {
                 )
                 .hasRole("PATIENT")
 
+                .requestMatchers(
+                    HttpMethod.PATCH,
+                    "/api/appointments/*/cancel"
+                )
+                .hasRole("PATIENT")
+
                 .requestMatchers("/api/admin/**")
                     .hasRole("ADMIN")
 

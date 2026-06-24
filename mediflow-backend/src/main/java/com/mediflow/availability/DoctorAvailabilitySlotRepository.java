@@ -7,6 +7,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import com.mediflow.appointment.AppointmentStatus;
+
 public interface DoctorAvailabilitySlotRepository
     extends JpaRepository<DoctorAvailabilitySlot, Long> {
 
@@ -19,17 +21,21 @@ public interface DoctorAvailabilitySlotRepository
               SELECT appointment.id
               FROM Appointment appointment
               WHERE appointment.availabilitySlot.id = slot.id
+                AND appointment.status <> :cancelledStatus
           )
         ORDER BY slot.startTime ASC
         """)
     List<DoctorAvailabilitySlot> findAvailableFutureSlots(
         @Param("doctorProfileId") Long doctorProfileId,
-        @Param("startTime") OffsetDateTime startTime
+        @Param("startTime") OffsetDateTime startTime,
+        @Param("cancelledStatus")
+            AppointmentStatus cancelledStatus
     );
 
-    boolean existsByDoctorProfileIdAndStartTimeLessThanAndEndTimeGreaterThan(
-        Long doctorProfileId,
-        OffsetDateTime proposedEndTime,
-        OffsetDateTime proposedStartTime
-    );
+    boolean
+        existsByDoctorProfileIdAndStartTimeLessThanAndEndTimeGreaterThan(
+            Long doctorProfileId,
+            OffsetDateTime proposedEndTime,
+            OffsetDateTime proposedStartTime
+        );
 }
