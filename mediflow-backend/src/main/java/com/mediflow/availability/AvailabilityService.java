@@ -15,6 +15,10 @@ import com.mediflow.user.Role;
 import com.mediflow.user.User;
 import com.mediflow.user.UserRepository;
 
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.List;
+
 @Service
 public class AvailabilityService {
 
@@ -105,6 +109,36 @@ public class AvailabilityService {
             savedSlot.getStartTime(),
             savedSlot.getEndTime()
         );
+    }
+
+    @Transactional(readOnly = true)
+    public List<AvailabilitySlotResponse> getFutureSlots(
+        Long doctorProfileId
+    ) {
+        DoctorProfile doctorProfile =
+            doctorProfileRepository.findById(doctorProfileId)
+                .filter(profile ->
+                    profile.getUser().isEnabled()
+                        && profile.getUser().getRole() == Role.DOCTOR
+                )
+                .orElseThrow(() -> new ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Doctor profile was not found"
+                ));
+
+        return slotRepository
+            .findAllByDoctorProfileIdAndStartTimeGreaterThanEqualOrderByStartTimeAsc(
+                doctorProfile.getId(),
+                OffsetDateTime.now(ZoneOffset.UTC)
+            )
+            .stream()
+            .map(slot -> new AvailabilitySlotResponse(
+                slot.getId(),
+                doctorProfile.getId(),
+                slot.getStartTime(),
+                slot.getEndTime()
+            ))
+            .toList();
     }
 
     private ResponseStatusException overlapException() {
