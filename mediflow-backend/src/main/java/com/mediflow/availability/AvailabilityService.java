@@ -1,5 +1,7 @@
 package com.mediflow.availability;
 
+import org.hibernate.exception.ConstraintViolationException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,80 +18,118 @@ import com.mediflow.user.UserRepository;
 @Service
 public class AvailabilityService {
 
-private final UserRepository userRepository;
-private final DoctorProfileRepository doctorProfileRepository;
-private final DoctorAvailabilitySlotRepository slotRepository;
+    private static final String OVERLAP_CONSTRAINT =
+        "ex_doctor_availability_no_overlap";
 
-public AvailabilityService(
-    UserRepository userRepository,
-    DoctorProfileRepository doctorProfileRepository,
-    DoctorAvailabilitySlotRepository slotRepository
-) {
-    this.userRepository = userRepository;
-    this.doctorProfileRepository = doctorProfileRepository;
-    this.slotRepository = slotRepository;
-}
+    private static final String DUPLICATE_SLOT_CONSTRAINT =
+        "uq_doctor_availability_slot";
 
-@Transactional
-public AvailabilitySlotResponse createSlot(
-    String doctorEmail,
-    CreateAvailabilitySlotRequest request
-) {
-    User doctorUser = userRepository.findByEmail(doctorEmail)
-        .filter(User::isEnabled)
-        .filter(user -> user.getRole() == Role.DOCTOR)
-        .orElseThrow(() -> new ResponseStatusException(
-            HttpStatus.FORBIDDEN,
-            "Doctor account is unavailable"
-        ));
+    private final UserRepository userRepository;
+    private final DoctorProfileRepository doctorProfileRepository;
+    private final DoctorAvailabilitySlotRepository slotRepository;
 
-    DoctorProfile doctorProfile =
-        doctorProfileRepository.findByUserId(
-            doctorUser.getId()
-        )
-        .orElseThrow(() -> new ResponseStatusException(
-            HttpStatus.NOT_FOUND,
-            "Doctor profile was not found"
-        ));
+    public AvailabilityService(
+        UserRepository userRepository,
+        DoctorProfileRepository doctorProfileRepository,
+        DoctorAvailabilitySlotRepository slotRepository
+    ) {
+        this.userRepository = userRepository;
+        this.doctorProfileRepository = doctorProfileRepository;
+        this.slotRepository = slotRepository;
+    }
 
-    if (!request.endTime().isAfter(request.startTime())) {
-        throw new ResponseStatusException(
-            HttpStatus.BAD_REQUEST,
-            "End time must be after start time"
+    @Transactional
+    public AvailabilitySlotResponse createSlot(
+        String doctorEmail,
+        CreateAvailabilitySlotRequest request
+    ) {
+        User doctorUser = userRepository.findByEmail(doctorEmail)
+            .filter(User::isEnabled)
+            .filter(user -> user.getRole() == Role.DOCTOR)
+            .orElseThrow(() -> new ResponseStatusException(
+                HttpStatus.FORBIDDEN,
+                "Doctor account is unavailable"
+            ));
+
+        DoctorProfile doctorProfile =
+            doctorProfileRepository.findByUserId(doctorUser.getId())
+                .orElseThrow(() -> new ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Doctor profile was not found"
+                ));
+
+        if (!request.endTime().isAfter(request.startTime())) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "End time must be after start time"
+            );
+        }
+
+        boolean overlaps = slotRepository
+            .existsByDoctorProfileIdAndStartTimeLessThanAndEndTimeGreaterThan(
+                doctorProfile.getId(),
+                request.endTime(),
+                request.startTime()
+            );
+
+        if (overlaps) {
+            throw overlapException();
+        }
+
+        DoctorAvailabilitySlot slot =
+            new DoctorAvailabilitySlot();
+
+        slot.setDoctorProfile(doctorProfile);
+        slot.setStartTime(request.startTime());
+        slot.setEndTime(request.endTime());
+
+        DoctorAvailabilitySlot savedSlot;
+
+        try {
+            savedSlot = slotRepository.saveAndFlush(slot);
+        } catch (DataIntegrityViolationException exception) {
+            if (isAvailabilityConflict(exception)) {
+                throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Availability slot overlaps an existing slot",
+                    exception
+                );
+            }
+
+            throw exception;
+        }
+
+        return new AvailabilitySlotResponse(
+            savedSlot.getId(),
+            doctorProfile.getId(),
+            savedSlot.getStartTime(),
+            savedSlot.getEndTime()
         );
     }
 
-    boolean overlaps = slotRepository
-        .existsByDoctorProfileIdAndStartTimeLessThanAndEndTimeGreaterThan(
-            doctorProfile.getId(),
-            request.endTime(),
-            request.startTime()
-        );
-
-    if (overlaps) {
-        throw new ResponseStatusException(
+    private ResponseStatusException overlapException() {
+        return new ResponseStatusException(
             HttpStatus.CONFLICT,
             "Availability slot overlaps an existing slot"
         );
     }
 
-    DoctorAvailabilitySlot slot =
-        new DoctorAvailabilitySlot();
+    private boolean isAvailabilityConflict(
+        DataIntegrityViolationException exception
+    ) {
+        Throwable cause = exception;
 
-    slot.setDoctorProfile(doctorProfile);
-    slot.setStartTime(request.startTime());
-    slot.setEndTime(request.endTime());
+        while (cause != null) {
+            if (cause instanceof ConstraintViolationException violation) {
+                String constraintName = violation.getConstraintName();
 
-    DoctorAvailabilitySlot savedSlot =
-        slotRepository.save(slot);
+                return OVERLAP_CONSTRAINT.equals(constraintName)
+                    || DUPLICATE_SLOT_CONSTRAINT.equals(constraintName);
+            }
 
-    return new AvailabilitySlotResponse(
-        savedSlot.getId(),
-        doctorProfile.getId(),
-        savedSlot.getStartTime(),
-        savedSlot.getEndTime()
-    );
-}
+            cause = cause.getCause();
+        }
 
-
+        return false;
+    }
 }
