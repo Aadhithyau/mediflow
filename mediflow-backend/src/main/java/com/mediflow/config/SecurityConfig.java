@@ -45,6 +45,12 @@ public class SecurityConfig {
                 .hasRole("PATIENT")
 
                 .requestMatchers(
+                    HttpMethod.GET,
+                    "/api/appointments"
+                )
+                .hasRole("PATIENT")
+
+                .requestMatchers(
                     HttpMethod.POST,
                     "/api/appointments"
                 )

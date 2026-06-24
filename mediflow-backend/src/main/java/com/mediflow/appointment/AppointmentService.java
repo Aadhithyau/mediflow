@@ -2,6 +2,7 @@ package com.mediflow.appointment;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
 
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -125,6 +126,45 @@ public class AppointmentService {
             savedAppointment.getStatus(),
             savedAppointment.getCreatedAt()
         );
+    }
+
+    @Transactional(readOnly = true)
+    public List<AppointmentResponse> getPatientAppointments(
+        String patientEmail
+    ) {
+        User patient = userRepository.findByEmail(patientEmail)
+            .filter(User::isEnabled)
+            .filter(user -> user.getRole() == Role.PATIENT)
+            .orElseThrow(() -> new ResponseStatusException(
+                HttpStatus.FORBIDDEN,
+                "Patient account is unavailable"
+            ));
+
+        return appointmentRepository
+            .findAllForPatient(patient.getId())
+            .stream()
+            .map(appointment -> {
+                DoctorAvailabilitySlot slot =
+                    appointment.getAvailabilitySlot();
+
+                DoctorProfile doctorProfile =
+                    slot.getDoctorProfile();
+
+                User doctorUser = doctorProfile.getUser();
+
+                return new AppointmentResponse(
+                    appointment.getId(),
+                    slot.getId(),
+                    doctorProfile.getId(),
+                    doctorUser.getFullName(),
+                    slot.getStartTime(),
+                    slot.getEndTime(),
+                    appointment.getConsultationFeeSnapshot(),
+                    appointment.getStatus(),
+                    appointment.getCreatedAt()
+                );
+            })
+            .toList();
     }
 
     private ResponseStatusException bookingConflict() {
