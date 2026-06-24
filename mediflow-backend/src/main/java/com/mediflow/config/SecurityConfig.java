@@ -15,86 +15,90 @@ import org.springframework.security.web.SecurityFilterChain;
 @Configuration
 public class SecurityConfig {
 
-@Bean
-SecurityFilterChain securityFilterChain(
-    HttpSecurity http,
-    JwtAuthenticationConverter jwtAuthenticationConverter
-) throws Exception {
+    @Bean
+    SecurityFilterChain securityFilterChain(
+        HttpSecurity http,
+        JwtAuthenticationConverter jwtAuthenticationConverter
+    ) throws Exception {
 
-    http
-        .csrf(AbstractHttpConfigurer::disable)
-        .formLogin(AbstractHttpConfigurer::disable)
-        .httpBasic(AbstractHttpConfigurer::disable)
-        .sessionManagement(session ->
-            session.sessionCreationPolicy(
-                SessionCreationPolicy.STATELESS
-            )
-        )
-        .authorizeHttpRequests(authorize -> authorize
-            .requestMatchers(
-                "/api/health",
-                "/actuator/health",
-                "/api/auth/**",
-                "/error"
-            ).permitAll()
-
-            .requestMatchers(
-                HttpMethod.GET,
-                "/api/doctors/*/availability-slots"
-            )
-            .hasRole("PATIENT")
-
-            .requestMatchers("/api/admin/**")
-                .hasRole("ADMIN")
-
-            .requestMatchers("/api/doctor/**")
-                .hasRole("DOCTOR")
-
-            .requestMatchers("/api/users/me")
-                .hasAnyRole(
-                    "PATIENT",
-                    "DOCTOR",
-                    "ADMIN"
-                )
-
-            .anyRequest()
-                .authenticated()
-        )
-        .oauth2ResourceServer(oauth2 ->
-            oauth2.jwt(jwt ->
-                jwt.jwtAuthenticationConverter(
-                    jwtAuthenticationConverter
+        http
+            .csrf(AbstractHttpConfigurer::disable)
+            .formLogin(AbstractHttpConfigurer::disable)
+            .httpBasic(AbstractHttpConfigurer::disable)
+            .sessionManagement(session ->
+                session.sessionCreationPolicy(
+                    SessionCreationPolicy.STATELESS
                 )
             )
+            .authorizeHttpRequests(authorize -> authorize
+                .requestMatchers(
+                    "/api/health",
+                    "/actuator/health",
+                    "/api/auth/**",
+                    "/error"
+                ).permitAll()
+
+                .requestMatchers(
+                    HttpMethod.GET,
+                    "/api/doctors/*/availability-slots"
+                )
+                .hasRole("PATIENT")
+
+                .requestMatchers(
+                    HttpMethod.POST,
+                    "/api/appointments"
+                )
+                .hasRole("PATIENT")
+
+                .requestMatchers("/api/admin/**")
+                    .hasRole("ADMIN")
+
+                .requestMatchers("/api/doctor/**")
+                    .hasRole("DOCTOR")
+
+                .requestMatchers("/api/users/me")
+                    .hasAnyRole(
+                        "PATIENT",
+                        "DOCTOR",
+                        "ADMIN"
+                    )
+
+                .anyRequest()
+                    .authenticated()
+            )
+            .oauth2ResourceServer(oauth2 ->
+                oauth2.jwt(jwt ->
+                    jwt.jwtAuthenticationConverter(
+                        jwtAuthenticationConverter
+                    )
+                )
+            );
+
+        return http.build();
+    }
+
+    @Bean
+    JwtAuthenticationConverter jwtAuthenticationConverter() {
+
+        JwtGrantedAuthoritiesConverter authoritiesConverter =
+            new JwtGrantedAuthoritiesConverter();
+
+        authoritiesConverter.setAuthoritiesClaimName("role");
+        authoritiesConverter.setAuthorityPrefix("ROLE_");
+
+        JwtAuthenticationConverter authenticationConverter =
+            new JwtAuthenticationConverter();
+
+        authenticationConverter.setJwtGrantedAuthoritiesConverter(
+            authoritiesConverter
         );
 
-    return http.build();
-}
+        return authenticationConverter;
+    }
 
-@Bean
-JwtAuthenticationConverter jwtAuthenticationConverter() {
-
-    JwtGrantedAuthoritiesConverter authoritiesConverter =
-        new JwtGrantedAuthoritiesConverter();
-
-    authoritiesConverter.setAuthoritiesClaimName("role");
-    authoritiesConverter.setAuthorityPrefix("ROLE_");
-
-    JwtAuthenticationConverter authenticationConverter =
-        new JwtAuthenticationConverter();
-
-    authenticationConverter.setJwtGrantedAuthoritiesConverter(
-        authoritiesConverter
-    );
-
-    return authenticationConverter;
-}
-
-@Bean
-PasswordEncoder passwordEncoder() {
-    return PasswordEncoderFactories
-        .createDelegatingPasswordEncoder();
-}
-
-
+    @Bean
+    PasswordEncoder passwordEncoder() {
+        return PasswordEncoderFactories
+            .createDelegatingPasswordEncoder();
+    }
 }
