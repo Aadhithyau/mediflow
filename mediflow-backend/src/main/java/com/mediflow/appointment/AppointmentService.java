@@ -5,6 +5,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 
 import org.hibernate.exception.ConstraintViolationException;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -30,15 +31,18 @@ public class AppointmentService {
     private final AppointmentRepository appointmentRepository;
     private final DoctorAvailabilitySlotRepository slotRepository;
     private final UserRepository userRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     public AppointmentService(
         AppointmentRepository appointmentRepository,
         DoctorAvailabilitySlotRepository slotRepository,
-        UserRepository userRepository
+        UserRepository userRepository,
+        ApplicationEventPublisher eventPublisher
     ) {
         this.appointmentRepository = appointmentRepository;
         this.slotRepository = slotRepository;
         this.userRepository = userRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional
@@ -219,6 +223,12 @@ public class AppointmentService {
 
         Appointment savedAppointment =
             appointmentRepository.saveAndFlush(appointment);
+
+        eventPublisher.publishEvent(
+            new AppointmentCompletedEvent(
+                savedAppointment.getId()
+            )
+        );
 
         return toDoctorAppointmentResponse(savedAppointment);
     }

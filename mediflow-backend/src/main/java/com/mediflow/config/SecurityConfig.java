@@ -39,6 +39,12 @@ public class SecurityConfig {
                 ).permitAll()
 
                 .requestMatchers(
+                    HttpMethod.POST,
+                    "/api/payments/webhooks/razorpay"
+                )
+                .permitAll()
+
+                .requestMatchers(
                     HttpMethod.GET,
                     "/api/doctors/*/availability-slots"
                 )
@@ -47,6 +53,12 @@ public class SecurityConfig {
                 .requestMatchers(
                     HttpMethod.GET,
                     "/api/appointments"
+                )
+                .hasRole("PATIENT")
+
+                .requestMatchers(
+                    HttpMethod.GET,
+                    "/api/appointments/*/payment"
                 )
                 .hasRole("PATIENT")
 
