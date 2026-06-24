@@ -13,6 +13,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.mediflow.appointment.dto.AppointmentResponse;
 import com.mediflow.appointment.dto.CreateAppointmentRequest;
+import com.mediflow.appointment.dto.DoctorAppointmentResponse;
 import com.mediflow.availability.DoctorAvailabilitySlot;
 import com.mediflow.availability.DoctorAvailabilitySlotRepository;
 import com.mediflow.doctor.DoctorProfile;
@@ -165,6 +166,86 @@ public class AppointmentService {
                 );
             })
             .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<DoctorAppointmentResponse> getDoctorAppointments(
+        String doctorEmail
+    ) {
+        User doctor = findEnabledDoctor(doctorEmail);
+
+        return appointmentRepository
+            .findAllForDoctorUser(doctor.getId())
+            .stream()
+            .map(this::toDoctorAppointmentResponse)
+            .toList();
+    }
+
+    @Transactional
+    public DoctorAppointmentResponse completeAppointment(
+        String doctorEmail,
+        Long appointmentId
+    ) {
+        User doctor = findEnabledDoctor(doctorEmail);
+
+        Appointment appointment = appointmentRepository
+            .findOwnedAppointmentForDoctor(
+                appointmentId,
+                doctor.getId()
+            )
+            .orElseThrow(() -> new ResponseStatusException(
+                HttpStatus.NOT_FOUND,
+                "Appointment was not found for this doctor"
+            ));
+
+        if (appointment.getStatus() != AppointmentStatus.BOOKED) {
+            throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "Appointment has already been completed"
+            );
+        }
+
+        appointment.setStatus(AppointmentStatus.COMPLETED);
+        appointment.setCompletedAt(
+            OffsetDateTime.now(ZoneOffset.UTC)
+        );
+
+        Appointment savedAppointment =
+            appointmentRepository.saveAndFlush(appointment);
+
+        return toDoctorAppointmentResponse(savedAppointment);
+    }
+
+    private User findEnabledDoctor(String doctorEmail) {
+        return userRepository.findByEmail(doctorEmail)
+            .filter(User::isEnabled)
+            .filter(user -> user.getRole() == Role.DOCTOR)
+            .orElseThrow(() -> new ResponseStatusException(
+                HttpStatus.FORBIDDEN,
+                "Doctor account is unavailable"
+            ));
+    }
+
+    private DoctorAppointmentResponse toDoctorAppointmentResponse(
+        Appointment appointment
+    ) {
+        DoctorAvailabilitySlot slot =
+            appointment.getAvailabilitySlot();
+
+        User patient = appointment.getPatient();
+
+        return new DoctorAppointmentResponse(
+            appointment.getId(),
+            slot.getId(),
+            patient.getId(),
+            patient.getFullName(),
+            slot.getStartTime(),
+            slot.getEndTime(),
+            appointment.getConsultationFeeSnapshot(),
+            appointment.getStatus(),
+            appointment.getCompletedAt(),
+            appointment.getCreatedAt()
+        );
     }
 
     private ResponseStatusException bookingConflict() {
