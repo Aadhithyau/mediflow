@@ -1,5 +1,9 @@
 package com.mediflow.availability;
 
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.List;
+
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -14,10 +18,6 @@ import com.mediflow.doctor.DoctorProfileRepository;
 import com.mediflow.user.Role;
 import com.mediflow.user.User;
 import com.mediflow.user.UserRepository;
-
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
-import java.util.List;
 
 @Service
 public class AvailabilityService {
@@ -127,7 +127,7 @@ public class AvailabilityService {
                 ));
 
         return slotRepository
-            .findAllByDoctorProfileIdAndStartTimeGreaterThanEqualOrderByStartTimeAsc(
+            .findAvailableFutureSlots(
                 doctorProfile.getId(),
                 OffsetDateTime.now(ZoneOffset.UTC)
             )
