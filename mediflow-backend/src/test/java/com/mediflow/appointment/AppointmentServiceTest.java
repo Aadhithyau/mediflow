@@ -2,13 +2,17 @@ package com.mediflow.appointment;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.context.ApplicationEventPublisher;
@@ -23,6 +27,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.mediflow.appointment.dto.AppointmentResponse;
+import com.mediflow.appointment.dto.DoctorAppointmentResponse;
 import com.mediflow.availability.DoctorAvailabilitySlot;
 import com.mediflow.availability.DoctorAvailabilitySlotRepository;
 import com.mediflow.doctor.DoctorProfile;
@@ -44,6 +49,8 @@ class AppointmentServiceTest {
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
+    @Mock
+    private Clock clock;
 
     @InjectMocks
     private AppointmentService appointmentService;
@@ -252,5 +259,203 @@ class AppointmentServiceTest {
             appointmentRepository,
             slotRepository
         );
+    }
+
+    @Test
+    void completeAppointmentRejectsBeforeScheduledStartTime() {
+        String doctorEmail = "doctor@example.com";
+        Long doctorId = 20L;
+        Long appointmentId = 101L;
+
+        OffsetDateTime now =
+            OffsetDateTime.parse("2030-01-15T09:00:00Z");
+
+        User doctor = mock(User.class);
+        Appointment appointment = mock(Appointment.class);
+
+        DoctorAvailabilitySlot slot =
+            mock(DoctorAvailabilitySlot.class);
+
+        when(userRepository.findByEmail(doctorEmail))
+            .thenReturn(Optional.of(doctor));
+
+        when(doctor.isEnabled())
+            .thenReturn(true);
+
+        when(doctor.getRole())
+            .thenReturn(Role.DOCTOR);
+
+        when(doctor.getId())
+            .thenReturn(doctorId);
+
+        when(appointmentRepository.findOwnedAppointmentForDoctor(
+            appointmentId,
+            doctorId
+        ))
+            .thenReturn(Optional.of(appointment));
+
+        when(appointment.getStatus())
+            .thenReturn(AppointmentStatus.BOOKED);
+
+        when(appointment.getAvailabilitySlot())
+            .thenReturn(slot);
+
+        when(slot.getStartTime())
+            .thenReturn(now.plusMinutes(1));
+
+        when(clock.instant())
+            .thenReturn(now.toInstant());
+
+        when(clock.getZone())
+            .thenReturn(ZoneOffset.UTC);
+
+        assertThatThrownBy(
+            () -> appointmentService.completeAppointment(
+                doctorEmail,
+                appointmentId
+            )
+        )
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(exception -> {
+                ResponseStatusException responseException =
+                    (ResponseStatusException) exception;
+
+                assertThat(responseException.getStatusCode())
+                    .isEqualTo(HttpStatus.CONFLICT);
+
+                assertThat(responseException.getReason())
+                    .isEqualTo(
+                        "Appointment cannot be completed before "
+                            + "its scheduled start time"
+                    );
+            });
+
+        verify(appointmentRepository, never())
+            .saveAndFlush(any(Appointment.class));
+
+        verify(appointment, never())
+            .setStatus(any(AppointmentStatus.class));
+
+        verify(appointment, never())
+            .setCompletedAt(any(OffsetDateTime.class));
+
+        verifyNoInteractions(eventPublisher);
+    }
+
+    @Test
+    void completeAppointmentAllowsCompletionAtScheduledStartTime() {
+        String doctorEmail = "doctor@example.com";
+        Long doctorId = 20L;
+        Long appointmentId = 101L;
+        Long slotId = 201L;
+        Long patientId = 301L;
+
+        OffsetDateTime startTime =
+            OffsetDateTime.parse("2030-01-15T09:00:00Z");
+
+        OffsetDateTime endTime =
+            startTime.plusHours(1);
+
+        OffsetDateTime createdAt =
+            OffsetDateTime.parse("2030-01-01T08:00:00Z");
+
+        User doctor = mock(User.class);
+        User patient = mock(User.class);
+        Appointment appointment = mock(Appointment.class);
+
+        DoctorAvailabilitySlot slot =
+            mock(DoctorAvailabilitySlot.class);
+
+        when(userRepository.findByEmail(doctorEmail))
+            .thenReturn(Optional.of(doctor));
+
+        when(doctor.isEnabled())
+            .thenReturn(true);
+
+        when(doctor.getRole())
+            .thenReturn(Role.DOCTOR);
+
+        when(doctor.getId())
+            .thenReturn(doctorId);
+
+        when(appointmentRepository.findOwnedAppointmentForDoctor(
+            appointmentId,
+            doctorId
+        ))
+            .thenReturn(Optional.of(appointment));
+
+        when(appointment.getStatus())
+            .thenReturn(
+                AppointmentStatus.BOOKED,
+                AppointmentStatus.COMPLETED
+            );
+
+        when(appointment.getAvailabilitySlot())
+            .thenReturn(slot);
+
+        when(appointment.getPatient())
+            .thenReturn(patient);
+
+        when(appointment.getId())
+            .thenReturn(appointmentId);
+
+        when(appointment.getConsultationFeeSnapshot())
+            .thenReturn(new BigDecimal("700.00"));
+
+        when(appointment.getCompletedAt())
+            .thenReturn(startTime);
+
+        when(appointment.getCreatedAt())
+            .thenReturn(createdAt);
+
+        when(slot.getId())
+            .thenReturn(slotId);
+
+        when(slot.getStartTime())
+            .thenReturn(startTime);
+
+        when(slot.getEndTime())
+            .thenReturn(endTime);
+
+        when(patient.getId())
+            .thenReturn(patientId);
+
+        when(patient.getFullName())
+            .thenReturn("Test Patient");
+
+        when(clock.instant())
+            .thenReturn(startTime.toInstant());
+
+        when(clock.getZone())
+            .thenReturn(ZoneOffset.UTC);
+
+        when(appointmentRepository.saveAndFlush(appointment))
+            .thenReturn(appointment);
+
+        DoctorAppointmentResponse result =
+            appointmentService.completeAppointment(
+                doctorEmail,
+                appointmentId
+            );
+
+        assertThat(result.status())
+            .isEqualTo(AppointmentStatus.COMPLETED);
+
+        assertThat(result.completedAt())
+            .isEqualTo(startTime);
+
+        verify(appointment)
+            .setStatus(AppointmentStatus.COMPLETED);
+
+        verify(appointment)
+            .setCompletedAt(startTime);
+
+        verify(appointmentRepository)
+            .saveAndFlush(appointment);
+
+        verify(eventPublisher)
+            .publishEvent(
+                new AppointmentCompletedEvent(appointmentId)
+            );
     }
 }

@@ -1,7 +1,7 @@
 package com.mediflow.appointment;
 
+import java.time.Clock;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.List;
 
 import org.hibernate.exception.ConstraintViolationException;
@@ -32,17 +32,20 @@ public class AppointmentService {
     private final DoctorAvailabilitySlotRepository slotRepository;
     private final UserRepository userRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final Clock clock;
 
     public AppointmentService(
         AppointmentRepository appointmentRepository,
         DoctorAvailabilitySlotRepository slotRepository,
         UserRepository userRepository,
-        ApplicationEventPublisher eventPublisher
+        ApplicationEventPublisher eventPublisher,
+        Clock clock
     ) {
         this.appointmentRepository = appointmentRepository;
         this.slotRepository = slotRepository;
         this.userRepository = userRepository;
         this.eventPublisher = eventPublisher;
+        this.clock = clock;
     }
 
     @Transactional
@@ -72,7 +75,7 @@ public class AppointmentService {
             );
         }
 
-        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        OffsetDateTime now = OffsetDateTime.now(clock);
 
         if (!slot.getStartTime().isAfter(now)) {
             throw new ResponseStatusException(
@@ -157,7 +160,7 @@ public class AppointmentService {
             );
         }
 
-        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        OffsetDateTime now = OffsetDateTime.now(clock);
 
         if (
             !appointment.getAvailabilitySlot()
@@ -216,10 +219,22 @@ public class AppointmentService {
             );
         }
 
+        OffsetDateTime now = OffsetDateTime.now(clock);
+
+        if (
+            appointment.getAvailabilitySlot()
+                .getStartTime()
+                .isAfter(now)
+        ) {
+            throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "Appointment cannot be completed before "
+                    + "its scheduled start time"
+            );
+        }
+
         appointment.setStatus(AppointmentStatus.COMPLETED);
-        appointment.setCompletedAt(
-            OffsetDateTime.now(ZoneOffset.UTC)
-        );
+        appointment.setCompletedAt(now);
 
         Appointment savedAppointment =
             appointmentRepository.saveAndFlush(appointment);

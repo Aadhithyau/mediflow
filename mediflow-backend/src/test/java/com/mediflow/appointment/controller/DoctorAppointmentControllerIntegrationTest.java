@@ -28,6 +28,7 @@ import com.mediflow.availability.DoctorAvailabilitySlot;
 import com.mediflow.availability.DoctorAvailabilitySlotRepository;
 import com.mediflow.doctor.DoctorProfile;
 import com.mediflow.doctor.DoctorProfileRepository;
+import com.mediflow.payment.PaymentRepository;
 import com.mediflow.user.Role;
 import com.mediflow.user.User;
 import com.mediflow.user.UserRepository;
@@ -54,6 +55,9 @@ class DoctorAppointmentControllerIntegrationTest {
 
     @Autowired
     private AppointmentRepository appointmentRepository;
+
+    @Autowired
+    private PaymentRepository paymentRepository;
 
     @Autowired
     private JwtService jwtService;
@@ -200,7 +204,7 @@ class DoctorAppointmentControllerIntegrationTest {
         OffsetDateTime startTime =
             OffsetDateTime.now(ZoneOffset.UTC)
                 .withNano(0)
-                .plusDays(1);
+                .minusMinutes(1);
 
         DoctorAvailabilitySlot slot = createSlot(
             doctorProfile,
@@ -264,6 +268,92 @@ class DoctorAppointmentControllerIntegrationTest {
                 )
         )
             .andExpect(status().isConflict());
+    }
+
+    @Test
+    void doctorCannotCompleteAppointmentBeforeScheduledStartTime()
+        throws Exception {
+
+        String uniqueValue = UUID.randomUUID().toString();
+
+        User doctor = createUser(
+            "Early Completion Doctor",
+            "early-completion-doctor-" + uniqueValue
+                + "@example.com",
+            Role.DOCTOR
+        );
+
+        User patient = createUser(
+            "Early Completion Patient",
+            "early-completion-patient-" + uniqueValue
+                + "@example.com",
+            Role.PATIENT
+        );
+
+        DoctorProfile doctorProfile = createDoctorProfile(
+            doctor,
+            "EARLY-" + uniqueValue
+        );
+
+        OffsetDateTime startTime =
+            OffsetDateTime.now(ZoneOffset.UTC)
+                .withNano(0)
+                .plusDays(1);
+
+        DoctorAvailabilitySlot slot = createSlot(
+            doctorProfile,
+            startTime,
+            startTime.plusHours(1)
+        );
+
+        Appointment appointment = createAppointment(
+            slot,
+            patient
+        );
+
+        String accessToken =
+            jwtService.generateAccessToken(doctor);
+
+        mockMvc.perform(
+            patch(
+                "/api/doctor/appointments/"
+                    + appointment.getId()
+                    + "/complete"
+            )
+                .header(
+                    HttpHeaders.AUTHORIZATION,
+                    "Bearer " + accessToken
+                )
+        )
+            .andExpect(status().isConflict())
+            .andExpect(
+                jsonPath("$.detail")
+                    .value(
+                        "Appointment cannot be completed before "
+                            + "its scheduled start time"
+                    )
+            );
+
+        entityManager.flush();
+        entityManager.clear();
+
+        Appointment unchangedAppointment =
+            appointmentRepository
+                .findById(appointment.getId())
+                .orElseThrow();
+
+        assertThat(unchangedAppointment.getStatus())
+            .isEqualTo(AppointmentStatus.BOOKED);
+
+        assertThat(unchangedAppointment.getCompletedAt())
+            .isNull();
+
+        assertThat(
+            paymentRepository.findByAppointment_Id(
+                appointment.getId()
+            )
+        )
+            .isEmpty();
     }
 
     @Test
