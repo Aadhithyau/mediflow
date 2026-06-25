@@ -113,6 +113,41 @@ public class AvailabilityService {
     }
 
     @Transactional(readOnly = true)
+    public List<AvailabilitySlotResponse> getOwnFutureSlots(
+        String doctorEmail
+    ) {
+        User doctorUser = userRepository.findByEmail(doctorEmail)
+            .filter(User::isEnabled)
+            .filter(user -> user.getRole() == Role.DOCTOR)
+            .orElseThrow(() -> new ResponseStatusException(
+                HttpStatus.FORBIDDEN,
+                "Doctor account is unavailable"
+            ));
+
+        DoctorProfile doctorProfile =
+            doctorProfileRepository.findByUserId(doctorUser.getId())
+                .orElseThrow(() -> new ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Doctor profile was not found"
+                ));
+
+        return slotRepository
+            .findAvailableFutureSlots(
+                doctorProfile.getId(),
+                OffsetDateTime.now(ZoneOffset.UTC),
+                AppointmentStatus.CANCELLED
+            )
+            .stream()
+            .map(slot -> new AvailabilitySlotResponse(
+                slot.getId(),
+                doctorProfile.getId(),
+                slot.getStartTime(),
+                slot.getEndTime()
+            ))
+            .toList();
+    }
+
+    @Transactional(readOnly = true)
     public List<AvailabilitySlotResponse> getFutureSlots(
         Long doctorProfileId
     ) {

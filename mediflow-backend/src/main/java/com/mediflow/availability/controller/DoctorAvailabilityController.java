@@ -1,6 +1,7 @@
 package com.mediflow.availability.controller;
 
 import org.springframework.http.HttpStatus;
+import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -8,6 +9,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.GetMapping;
 
 import com.mediflow.availability.AvailabilityService;
 import com.mediflow.availability.dto.AvailabilitySlotResponse;
@@ -26,6 +28,21 @@ public DoctorAvailabilityController(
 ) {
     this.availabilityService = availabilityService;
 }
+
+@GetMapping
+public ResponseEntity<List<AvailabilitySlotResponse>>
+getOwnFutureSlots(
+@AuthenticationPrincipal Jwt jwt
+) {
+
+return ResponseEntity.ok(
+    availabilityService.getOwnFutureSlots(
+        jwt.getSubject()
+    )
+);
+
+}
+
 
 @PostMapping
 public ResponseEntity<AvailabilitySlotResponse> createSlot(

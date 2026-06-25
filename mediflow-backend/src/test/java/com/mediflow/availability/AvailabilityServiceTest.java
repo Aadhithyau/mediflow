@@ -136,6 +136,86 @@ class AvailabilityServiceTest {
             eq(AppointmentStatus.CANCELLED)
         );
     }
+    @Test
+    void getOwnFutureSlotsUsesAuthenticatedDoctorsProfile() {
+    String doctorEmail = "doctor@example.com";
+    Long doctorUserId = 10L;
+    Long doctorProfileId = 20L;
+
+    User doctorUser = mock(User.class);
+    DoctorProfile doctorProfile = mock(DoctorProfile.class);
+    DoctorAvailabilitySlot slot =
+        mock(DoctorAvailabilitySlot.class);
+
+    OffsetDateTime startTime =
+        OffsetDateTime.parse("2030-01-10T09:00:00Z");
+
+    OffsetDateTime endTime =
+        OffsetDateTime.parse("2030-01-10T10:00:00Z");
+
+    when(userRepository.findByEmail(doctorEmail))
+        .thenReturn(Optional.of(doctorUser));
+
+    when(doctorUser.isEnabled())
+        .thenReturn(true);
+
+    when(doctorUser.getRole())
+        .thenReturn(Role.DOCTOR);
+
+    when(doctorUser.getId())
+        .thenReturn(doctorUserId);
+
+    when(
+        doctorProfileRepository.findByUserId(
+            doctorUserId
+        )
+    ).thenReturn(Optional.of(doctorProfile));
+
+    when(doctorProfile.getId())
+        .thenReturn(doctorProfileId);
+
+    when(slot.getId())
+        .thenReturn(30L);
+
+    when(slot.getStartTime())
+        .thenReturn(startTime);
+
+    when(slot.getEndTime())
+        .thenReturn(endTime);
+
+    when(
+        slotRepository.findAvailableFutureSlots(
+            eq(doctorProfileId),
+            any(OffsetDateTime.class),
+            eq(AppointmentStatus.CANCELLED)
+        )
+    ).thenReturn(List.of(slot));
+
+    List<AvailabilitySlotResponse> result =
+        availabilityService.getOwnFutureSlots(
+            doctorEmail
+        );
+
+    assertThat(result).containsExactly(
+        new AvailabilitySlotResponse(
+            30L,
+            doctorProfileId,
+            startTime,
+            endTime
+        )
+    );
+
+    verify(
+        doctorProfileRepository
+    ).findByUserId(doctorUserId);
+
+    verify(slotRepository).findAvailableFutureSlots(
+        eq(doctorProfileId),
+        any(OffsetDateTime.class),
+        eq(AppointmentStatus.CANCELLED)
+    );
+
+    }
 
     @Test
     void getFutureSlotsRejectsDisabledDoctorProfile() {
