@@ -52,6 +52,12 @@ public class DoctorProfile {
     )
     private BigDecimal consultationFee;
 
+    @Column(name = "hospital_name", length = 150)
+    private String hospitalName;
+
+    @Column(name = "hospital_address", length = 500)
+    private String hospitalAddress;
+
     @Column(length = 1000)
     private String bio;
 
@@ -116,6 +122,24 @@ public class DoctorProfile {
         this.consultationFee = consultationFee;
     }
 
+    public String getHospitalName() {
+        return hospitalName;
+    }
+
+    public void setHospitalName(String hospitalName) {
+        this.hospitalName = hospitalName;
+    }
+
+    public String getHospitalAddress() {
+        return hospitalAddress;
+    }
+
+    public void setHospitalAddress(
+        String hospitalAddress
+    ) {
+        this.hospitalAddress = hospitalAddress;
+    }
+
     public String getBio() {
         return bio;
     }
@@ -128,10 +152,9 @@ public class DoctorProfile {
         return createdAt;
     }
 
- 
     public OffsetDateTime getUpdatedAt() {
         return updatedAt;
     }
     }
-    
+
 

@@ -8,6 +8,8 @@ Long userId,
 String fullName,
 String specialization,
 BigDecimal consultationFee,
+String hospitalName,
+String hospitalAddress,
 String bio
 ) {
 }

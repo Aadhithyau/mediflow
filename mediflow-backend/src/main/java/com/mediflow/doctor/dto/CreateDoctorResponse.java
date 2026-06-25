@@ -11,6 +11,8 @@ public record CreateDoctorResponse(
     String specialization,
     String medicalLicenseNumber,
     BigDecimal consultationFee,
+    String hospitalName,
+    String hospitalAddress,
     String bio,
     String message
 ) {

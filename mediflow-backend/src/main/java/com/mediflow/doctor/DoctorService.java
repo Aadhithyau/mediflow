@@ -85,6 +85,12 @@ public CreateDoctorResponse createDoctor(
     doctorProfile.setConsultationFee(
         request.consultationFee()
     );
+    doctorProfile.setHospitalName(
+        request.hospitalName().trim()
+    );
+    doctorProfile.setHospitalAddress(
+        request.hospitalAddress().trim()
+    );
 
     String bio = request.bio();
 
@@ -106,6 +112,8 @@ public CreateDoctorResponse createDoctor(
         savedProfile.getSpecialization(),
         savedProfile.getMedicalLicenseNumber(),
         savedProfile.getConsultationFee(),
+        savedProfile.getHospitalName(),
+        savedProfile.getHospitalAddress(),
         savedProfile.getBio(),
         "Doctor created successfully"
     );
@@ -122,6 +130,8 @@ public List<DoctorSummaryResponse> getAllDoctors() {
             profile.getUser().getFullName(),
             profile.getSpecialization(),
             profile.getConsultationFee(),
+            profile.getHospitalName(),
+            profile.getHospitalAddress(),
             profile.getBio()
         ))
         .toList();

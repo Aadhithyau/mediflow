@@ -50,6 +50,16 @@ public record CreateDoctorRequest(
     )
     BigDecimal consultationFee,
 
+    @NotBlank(message = "Hospital name is required")
+    @Size(max = 150,
+        message = "Hospital name must not exceed 150 characters")
+    String hospitalName,
+
+    @NotBlank(message = "Hospital address is required")
+    @Size(max = 500,
+        message = "Hospital address must not exceed 500 characters")
+    String hospitalAddress,
+
     @Size(max = 1000,
         message = "Bio must not exceed 1000 characters")
     String bio
