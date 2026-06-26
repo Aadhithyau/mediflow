@@ -305,4 +305,113 @@ void failedPaymentLinkChangesStatusToFailed() {
 }
 
 
+
+    @Test
+    void failedPaymentResumesGatewayCall() {
+        Long appointmentId = 25L;
+
+        Appointment appointment = mock(Appointment.class);
+        User patient = mock(User.class);
+        Payment existingPayment = mock(Payment.class);
+
+        when(appointmentRepository.findById(appointmentId))
+            .thenReturn(Optional.of(appointment));
+
+        when(appointment.getStatus())
+            .thenReturn(AppointmentStatus.COMPLETED);
+
+        when(appointment.getId())
+            .thenReturn(appointmentId);
+
+        when(appointment.getPatient())
+            .thenReturn(patient);
+
+        when(patient.getFullName())
+            .thenReturn("Retry Payment Patient");
+
+        when(patient.getEmail())
+            .thenReturn("retry-payment@example.com");
+
+        when(
+            paymentRepository.findByAppointment_Id(
+                appointmentId
+            )
+        )
+            .thenReturn(Optional.of(existingPayment));
+
+        when(existingPayment.getStatus())
+            .thenReturn(
+                PaymentStatus.LINK_CREATION_FAILED
+            );
+
+        when(existingPayment.getId())
+            .thenReturn(63L);
+
+        when(existingPayment.getAmount())
+            .thenReturn(new BigDecimal("500.00"));
+
+        when(existingPayment.getRazorpayReferenceId())
+            .thenReturn("mediflow-appt-25");
+
+        PaymentCreationPlan plan =
+            paymentService.preparePayment(appointmentId);
+
+        assertThat(plan.requiresGatewayCall()).isTrue();
+        assertThat(plan.paymentId()).isEqualTo(63L);
+
+        assertThat(plan.request().amountInSmallestUnit())
+            .isEqualTo(50000L);
+
+        assertThat(plan.request().referenceId())
+            .isEqualTo("mediflow-appt-25");
+
+        assertThat(plan.request().customerName())
+            .isEqualTo("Retry Payment Patient");
+
+        assertThat(plan.request().customerEmail())
+            .isEqualTo("retry-payment@example.com");
+
+        verify(paymentRepository, never())
+            .saveAndFlush(any(Payment.class));
+    }
+
+    @Test
+    void successfulRetryChangesFailedPaymentToPending() {
+        Payment payment = new Payment();
+
+        payment.setStatus(
+            PaymentStatus.LINK_CREATION_FAILED
+        );
+        payment.setFailureMessage(
+            "Razorpay was temporarily unavailable"
+        );
+
+        when(paymentRepository.findById(64L))
+            .thenReturn(Optional.of(payment));
+
+        PaymentLinkResult result =
+            new PaymentLinkResult(
+                "plink_retry_64",
+                "https://rzp.io/i/retry64"
+            );
+
+        paymentService.markPaymentLinkCreated(
+            64L,
+            result
+        );
+
+        assertThat(payment.getStatus())
+            .isEqualTo(PaymentStatus.PAYMENT_PENDING);
+
+        assertThat(payment.getRazorpayPaymentLinkId())
+            .isEqualTo("plink_retry_64");
+
+        assertThat(payment.getRazorpayPaymentLinkUrl())
+            .isEqualTo("https://rzp.io/i/retry64");
+
+        assertThat(payment.getFailureMessage()).isNull();
+
+        verify(paymentRepository)
+            .saveAndFlush(payment);
+    }
 }

@@ -66,12 +66,28 @@ public class PaymentService {
             );
         }
 
-        if (
-            paymentRepository
-                .findByAppointment_Id(appointmentId)
-                .isPresent()
-        ) {
-            return PaymentCreationPlan.noAction();
+        Payment existingPayment = paymentRepository
+            .findByAppointment_Id(appointmentId)
+            .orElse(null);
+
+        if (existingPayment != null) {
+            if (
+                existingPayment.getStatus()
+                    != PaymentStatus.LINK_CREATION_PENDING
+                && existingPayment.getStatus()
+                    != PaymentStatus.LINK_CREATION_FAILED
+            ) {
+                return PaymentCreationPlan.noAction();
+            }
+
+            return new PaymentCreationPlan(
+                existingPayment.getId(),
+                buildPaymentLinkRequest(
+                    appointment,
+                    existingPayment.getAmount(),
+                    existingPayment.getRazorpayReferenceId()
+                )
+            );
         }
 
         BigDecimal amount =
@@ -107,23 +123,13 @@ public class PaymentService {
         Payment savedPayment =
             paymentRepository.saveAndFlush(payment);
 
-        User patient = appointment.getPatient();
-
-        PaymentLinkRequest request =
-            new PaymentLinkRequest(
-                toSmallestCurrencyUnit(amount),
-                DEFAULT_CURRENCY,
-                referenceId,
-                "MediFlow consultation payment for "
-                    + "appointment "
-                    + appointmentId,
-                patient.getFullName(),
-                patient.getEmail()
-            );
-
         return new PaymentCreationPlan(
             savedPayment.getId(),
-            request
+            buildPaymentLinkRequest(
+                appointment,
+                amount,
+                referenceId
+            )
         );
     }
 
@@ -143,6 +149,8 @@ public class PaymentService {
         if (
             payment.getStatus()
                 != PaymentStatus.LINK_CREATION_PENDING
+            && payment.getStatus()
+                != PaymentStatus.LINK_CREATION_FAILED
         ) {
             return;
         }
@@ -175,6 +183,8 @@ public class PaymentService {
         if (
             payment.getStatus()
                 != PaymentStatus.LINK_CREATION_PENDING
+            && payment.getStatus()
+                != PaymentStatus.LINK_CREATION_FAILED
         ) {
             return;
         }
@@ -219,6 +229,24 @@ public class PaymentService {
             ));
     }
 
+    private PaymentLinkRequest buildPaymentLinkRequest(
+        Appointment appointment,
+        BigDecimal amount,
+        String referenceId
+    ) {
+        User patient = appointment.getPatient();
+
+        return new PaymentLinkRequest(
+            toSmallestCurrencyUnit(amount),
+            DEFAULT_CURRENCY,
+            referenceId,
+            "MediFlow consultation payment for "
+                + "appointment "
+                + appointment.getId(),
+            patient.getFullName(),
+            patient.getEmail()
+        );
+    }
     private long toSmallestCurrencyUnit(
         BigDecimal amount
     ) {

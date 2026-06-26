@@ -8,25 +8,25 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import com.mediflow.appointment.AppointmentCompletedEvent;
-import com.mediflow.payment.AppointmentPaymentListener;
+import com.mediflow.payment.AppointmentPaymentProcessor;
 
 @ExtendWith(MockitoExtension.class)
 class AppointmentCompletedRabbitConsumerTest {
 
-	@Mock
-	private AppointmentPaymentListener paymentListener;
+@Mock
+private AppointmentPaymentProcessor paymentProcessor;
 
-	@InjectMocks
-	private AppointmentCompletedRabbitConsumer consumer;
+@InjectMocks
+private AppointmentCompletedRabbitConsumer consumer;
 
-	@Test
-	void delegatesMessageToPaymentListener() {
-		AppointmentCompletedMessage message = new AppointmentCompletedMessage(42L);
+@Test
+void delegatesMessageToPaymentProcessor() {
+    AppointmentCompletedMessage message =
+        new AppointmentCompletedMessage(42L);
 
-		consumer.consume(message);
+    consumer.consume(message);
 
-		verify(paymentListener).handleAppointmentCompleted(new AppointmentCompletedEvent(42L));
-	}
+    verify(paymentProcessor).process(42L);
+}
 
 }
