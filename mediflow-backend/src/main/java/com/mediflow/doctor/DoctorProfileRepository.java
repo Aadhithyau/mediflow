@@ -13,10 +13,13 @@ Optional<DoctorProfile> findByUserId(Long userId);
 boolean existsByUserId(Long userId);
 
 boolean existsByMedicalLicenseNumber(
-    String medicalLicenseNumber
+String medicalLicenseNumber
 );
 
 List<DoctorProfile>
-    findAllByUserEnabledTrueOrderByUserFullNameAsc();
+findAllByUserEnabledTrueOrderByUserFullNameAsc();
+
+List<DoctorProfile>
+findAllByOrderByUserFullNameAsc();
 
 }

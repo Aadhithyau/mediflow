@@ -9,9 +9,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.mediflow.doctor.dto.AdminDoctorResponse;
 import com.mediflow.doctor.dto.CreateDoctorRequest;
 import com.mediflow.doctor.dto.CreateDoctorResponse;
 import com.mediflow.doctor.dto.DoctorSummaryResponse;
+import com.mediflow.doctor.dto.UpdateDoctorAccountStatusRequest;
 import com.mediflow.user.Role;
 import com.mediflow.user.User;
 import com.mediflow.user.UserRepository;
@@ -135,6 +137,56 @@ public List<DoctorSummaryResponse> getAllDoctors() {
             profile.getBio()
         ))
         .toList();
+}
+
+@Transactional(readOnly = true)
+public List<AdminDoctorResponse> getAllDoctorsForAdmin() {
+    return doctorProfileRepository
+        .findAllByOrderByUserFullNameAsc()
+        .stream()
+        .map(this::toAdminDoctorResponse)
+        .toList();
+}
+
+@Transactional
+public AdminDoctorResponse updateDoctorAccountStatus(
+    Long doctorProfileId,
+    UpdateDoctorAccountStatusRequest request
+) {
+    DoctorProfile doctorProfile =
+        doctorProfileRepository
+            .findById(doctorProfileId)
+            .orElseThrow(() ->
+                new ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Doctor not found"
+                )
+            );
+
+    User doctorUser = doctorProfile.getUser();
+
+    doctorUser.setEnabled(request.enabled());
+    userRepository.save(doctorUser);
+
+    return toAdminDoctorResponse(doctorProfile);
+}
+
+private AdminDoctorResponse toAdminDoctorResponse(
+    DoctorProfile profile
+) {
+    return new AdminDoctorResponse(
+        profile.getId(),
+        profile.getUser().getId(),
+        profile.getUser().getFullName(),
+        profile.getUser().getEmail(),
+        profile.getUser().isEnabled(),
+        profile.getSpecialization(),
+        profile.getMedicalLicenseNumber(),
+        profile.getConsultationFee(),
+        profile.getHospitalName(),
+        profile.getHospitalAddress(),
+        profile.getBio()
+    );
 }
 
 }
