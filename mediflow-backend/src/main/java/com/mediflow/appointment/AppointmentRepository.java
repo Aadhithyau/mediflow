@@ -1,6 +1,9 @@
 package com.mediflow.appointment;
 
 import java.util.List;
+import java.time.OffsetDateTime;
+import org.springframework.data.jpa.repository.Lock;
+import jakarta.persistence.LockModeType;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -67,5 +70,21 @@ public interface AppointmentRepository
     Optional<Appointment> findOwnedAppointmentForPatient(
         @Param("appointmentId") Long appointmentId,
         @Param("patientUserId") Long patientUserId
+    );
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+        SELECT appointment
+        FROM Appointment appointment
+        JOIN appointment.availabilitySlot slot
+        WHERE appointment.status = :status
+          AND appointment.reminderQueuedAt IS NULL
+          AND slot.startTime > :windowStart
+          AND slot.startTime <= :windowEnd
+        ORDER BY slot.startTime ASC
+        """)
+    List<Appointment> findDueForReminder(
+        @Param("status") AppointmentStatus status,
+        @Param("windowStart") OffsetDateTime windowStart,
+        @Param("windowEnd") OffsetDateTime windowEnd
     );
 }

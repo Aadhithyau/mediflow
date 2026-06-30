@@ -56,6 +56,9 @@ public class Appointment {
 
     @Column(name = "completed_at")
     private OffsetDateTime completedAt;
+    
+    @Column(name = "reminder_queued_at")
+    private OffsetDateTime reminderQueuedAt;
 
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
@@ -126,6 +129,16 @@ public class Appointment {
         OffsetDateTime completedAt
     ) {
         this.completedAt = completedAt;
+    }
+    
+    public OffsetDateTime getReminderQueuedAt() {
+        return reminderQueuedAt;
+    }
+
+    public void setReminderQueuedAt(
+        OffsetDateTime reminderQueuedAt
+    ) {
+        this.reminderQueuedAt = reminderQueuedAt;
     }
 
     public OffsetDateTime getCreatedAt() {

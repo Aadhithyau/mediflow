@@ -120,7 +120,9 @@ public class AppointmentService {
             throw exception;
         }
 
-        return toPatientAppointmentResponse(savedAppointment);
+		eventPublisher.publishEvent(new AppointmentBookedEvent(savedAppointment.getId()));
+
+		return toPatientAppointmentResponse(savedAppointment);
     }
 
     @Transactional(readOnly = true)
@@ -176,10 +178,11 @@ public class AppointmentService {
         appointment.setStatus(AppointmentStatus.CANCELLED);
         appointment.setCompletedAt(null);
 
-        Appointment savedAppointment =
-            appointmentRepository.saveAndFlush(appointment);
+		Appointment savedAppointment = appointmentRepository.saveAndFlush(appointment);
 
-        return toPatientAppointmentResponse(savedAppointment);
+		eventPublisher.publishEvent(new AppointmentCancelledEvent(savedAppointment.getId()));
+
+		return toPatientAppointmentResponse(savedAppointment);
     }
 
     @Transactional(readOnly = true)
